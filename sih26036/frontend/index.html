@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Setu — Legal Metrology Verification</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">Setu</span>
+    <span class="brand-sub">Verification &amp; certification for weighing &amp; measuring instruments</span>
+  </div>
+
+  <div class="auth-box" id="auth-box">
+    <form id="login-form" class="login-form">
+      <input id="login-phone" placeholder="Phone number" required>
+      <button type="submit">Log in</button>
+    </form>
+    <div class="session-info" id="session-info" hidden>
+      <span id="session-label"></span>
+      <button type="button" class="link-btn" id="logout-btn">Log out</button>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="apply">Apply</button>
+    <button class="tab" data-tab="officer" data-roles="LMO,GATC,STATE_ADMIN,CENTRAL_ADMIN">Officer console</button>
+    <button class="tab" data-tab="verify">Verify a certificate</button>
+    <button class="tab" data-tab="admin" data-roles="STATE_ADMIN,CENTRAL_ADMIN">Admin</button>
+  </nav>
+</header>
+
+<div class="offline-banner" id="offline-banner" hidden>
+  You're offline. Field readings will be queued and sent automatically once you're back online.
+</div>
+
+<main>
+
+  <section class="panel active" id="panel-apply">
+    <h1>Apply for verification</h1>
+    <p class="lede">Register your instrument for verification or re-verification under the Legal Metrology Act, 2009. Already registered? Log in above first — this form will use your existing account.</p>
+    <form id="apply-form">
+      <fieldset id="apply-applicant-fields">
+        <legend>Applicant</legend>
+        <label class="field"><span>Full name</span><input id="apply-name" required></label>
+        <label class="field"><span>Phone</span><input id="apply-phone" required></label>
+        <div class="field-row">
+          <label class="field"><span>State</span><input id="apply-state" required></label>
+          <label class="field"><span>District</span><input id="apply-district" required></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Instrument</legend>
+        <label class="field"><span>Serial number</span><input id="apply-serial" required></label>
+        <label class="field"><span>Instrument type</span>
+          <select id="apply-instrument-type" required></select>
+        </label>
+        <label class="field"><span>Location / address</span><input id="apply-location" required></label>
+        <div class="field-row">
+          <label class="field"><span>Latitude</span><input id="apply-lat" type="number" step="any"></label>
+          <label class="field"><span>Longitude</span><input id="apply-lng" type="number" step="any"></label>
+        </div>
+        <button type="button" class="link-btn" id="apply-use-location">Use my current location</button>
+      </fieldset>
+      <button type="submit" class="primary">Submit application</button>
+    </form>
+    <div id="apply-result" class="result"></div>
+  </section>
+
+  <section class="panel" id="panel-officer">
+    <h1>Officer console</h1>
+    <p class="lede">Record a field inspection, then issue the signed certificate. Go offline (airplane mode / DevTools → Network → Offline) and submit anyway — it queues locally and syncs the moment you're back.</p>
+
+    <details class="routes-box">
+      <summary>Suggested routes (geo-clustered pending applications)</summary>
+      <button type="button" id="load-routes-btn" class="secondary">Load suggested routes</button>
+      <div id="routes-result"></div>
+    </details>
+
+    <form id="officer-verify-form">
+      <label class="field"><span>Application</span>
+        <select id="officer-application"></select>
+      </label>
+      <fieldset>
+        <legend>Observed readings</legend>
+        <div id="officer-observation-fields" class="observation-grid"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Capture evidence</legend>
+        <div class="field-row">
+          <label class="field"><span>GPS latitude</span><input id="officer-lat" type="number" step="any" required></label>
+          <label class="field"><span>GPS longitude</span><input id="officer-lng" type="number" step="any" required></label>
+        </div>
+        <button type="button" class="link-btn" id="officer-use-location">Use my current location</button>
+        <label class="field">
+          <span>Photo evidence</span>
+          <input id="officer-photo" type="file" accept="image/*" capture="environment">
+        </label>
+        <img id="officer-photo-preview" hidden alt="Captured evidence preview">
+      </fieldset>
+      <button type="submit" class="primary">Record verification</button>
+    </form>
+
+    <div id="queue-status" class="queue-status" hidden></div>
+    <div id="officer-result" class="result"></div>
+  </section>
+
+  <section class="panel" id="panel-verify">
+    <h1>Verify a certificate</h1>
+    <p class="lede">Paste a certificate token or the full link from a scanned QR code.</p>
+    <form id="verify-form">
+      <label class="field"><span>Token or link</span><input id="verify-input" required></label>
+      <button type="submit" class="primary">Check validity</button>
+    </form>
+    <div id="verify-result" class="result"></div>
+  </section>
+
+  <section class="panel" id="panel-admin">
+    <h1>Admin — bulk import</h1>
+    <p class="lede">Cold-start historical records, or federate an LMO/GATC roster in from a central list rather than letting officers self-register.</p>
+
+    <fieldset>
+      <legend>Import instruments (legacy records)</legend>
+      <p class="hint">CSV columns: ownerName, ownerPhone, state, district, serialNumber, instrumentType, location, latitude, longitude</p>
+      <textarea id="import-instruments-csv" rows="5" placeholder="ownerName,ownerPhone,state,district,serialNumber,instrumentType,location,latitude,longitude"></textarea>
+      <button type="button" class="primary" id="import-instruments-btn">Import instruments</button>
+      <div id="import-instruments-result" class="result"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Import stakeholders (LMO / GATC roster)</legend>
+      <p class="hint">CSV columns: role, name, phone, state, district, sourceRegistry</p>
+      <textarea id="import-stakeholders-csv" rows="5" placeholder="role,name,phone,state,district,sourceRegistry"></textarea>
+      <button type="button" class="primary" id="import-stakeholders-btn">Import stakeholders</button>
+      <div id="import-stakeholders-result" class="result"></div>
+    </fieldset>
+  </section>
+
+</main>
+
+<script src="idb-queue.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

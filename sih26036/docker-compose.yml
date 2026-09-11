@@ -1,0 +1,98 @@
+# services:
+#   db:
+#     image: postgres:16
+#     restart: unless-stopped
+#     environment:
+#       POSTGRES_USER: postgres
+#         # POSTGRES_PASSWORD: sih26036
+#       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+#       # POSTGRES_DB: sih26036
+#       POSTGRES_DB: ${POSTGRES_DB}
+#     volumes:
+#       - db-data:/var/lib/postgresql/data
+#       # Postgres auto-runs everything here, alphabetically, but ONLY the
+#       # very first time the data volume is empty. schema.sql < seed.sql
+#       # alphabetically, so ordering is correct with no extra config.
+#       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+#       - ./database/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U postgres"]
+#       interval: 3s
+#       timeout: 3s
+#       retries: 10
+
+#   backend:
+#     build: .
+#     restart: unless-stopped
+#     depends_on:
+#       db:
+#         condition: service_healthy
+#     environment:
+#       DATABASE_URL: ${DATABASE_URL}
+#       PORT: ${PORT}
+#       PUBLIC_VERIFY_BASE: ${PUBLIC_VERIFY_BASE}
+#       JWT_SECRET: ${JWT_SECRET}
+#     ports:
+#       - "3000:3000"
+#     volumes:
+#       # named volume so keys persist across `docker compose down` / rebuilds
+#       - backend-keys:/app/backend/keys
+
+# volumes:
+#   db-data:
+#   backend-keys:
+
+
+services:
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+      # Postgres auto-runs these files alphabetically
+      # only when the data volume is empty.
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: .
+    restart: unless-stopped
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      PORT: ${PORT}
+      PUBLIC_VERIFY_BASE: ${PUBLIC_VERIFY_BASE}
+      JWT_SECRET: ${JWT_SECRET}
+
+    ports:
+      - "3000:3000"
+
+    volumes:
+      # Named volume so keys persist across rebuilds
+      - backend-keys:/app/backend/keys
+
+      # Uploaded verification photos persist across container rebuilds
+      - uploads-data:/app/backend/uploads
+
+volumes:
+  db-data:
+  backend-keys:
+  uploads-data:

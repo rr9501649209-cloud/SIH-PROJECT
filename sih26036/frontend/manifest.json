@@ -1,0 +1,9 @@
+{
+  "name": "Setu — Legal Metrology Verification",
+  "short_name": "Setu",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F1F3F6",
+  "theme_color": "#17213D",
+  "icons": []
+}

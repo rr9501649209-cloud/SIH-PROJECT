@@ -1,0 +1,124 @@
+// schema.prisma
+// Core data model for SIH26036 — Legal Metrology Verification Platform
+// Positioned to interoperate with DoCA's eMaap registry: GATC/LMO identities
+// are federated in via `sourceRegistry`, not self-registered — this closes
+// the fake-GATC trust gap flagged in the mentoring session.
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum StakeholderRole {
+  APPLICANT // instrument owner / business
+  LMO // Legal Metrology Officer, state govt staff
+  GATC // Government Approved Test Centre
+  STATE_ADMIN
+  CENTRAL_ADMIN
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  SCHEDULED
+  IN_PROGRESS
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+model Stakeholder {
+  id            String   @id @default(uuid())
+  role          StakeholderRole
+  name          String
+  phone         String
+  email         String?
+  preferredLang String   @default("en") // drives UI language, not a cosmetic field
+  // GATC/LMO records sync from DoCA's central registry (emaap.gov.in/gatc);
+  // null means this is a self-registered applicant instead
+  sourceRegistry String?
+  state         String
+  district      String
+  latitude      Float?
+  longitude     Float? // feeds the route-clustering scheduler, not just a map pin
+  applications  Application[]  @relation("ApplicantApplications")
+  scheduleSlots ScheduleSlot[] @relation("OfficerSlots")
+  createdAt     DateTime @default(now())
+}
+
+model InstrumentType {
+  id                  String   @id @default(uuid())
+  name                String // e.g. "Road weighbridge", "Fuel dispenser", "Taximeter"
+  category            String
+  // JSON-schema-driven parameter template so DoCA can add a new instrument
+  // category (with its own test parameters/tolerances) without a redeploy
+  parameterSchema     Json
+  defaultValidityDays Int // reverification cycle varies by instrument — never hardcode "365"
+  instruments         Instrument[]
+}
+
+model Instrument {
+  id               String   @id @default(uuid())
+  serialNumber     String   @unique
+  ownerId          String
+  owner            Stakeholder    @relation(fields: [ownerId], references: [id])
+  instrumentTypeId String
+  instrumentType   InstrumentType @relation(fields: [instrumentTypeId], references: [id])
+  location         String
+  latitude         Float?
+  longitude        Float?
+  applications     Application[]
+  createdAt        DateTime @default(now())
+}
+
+model Application {
+  id           String   @id @default(uuid())
+  applicantId  String
+  applicant    Stakeholder @relation("ApplicantApplications", fields: [applicantId], references: [id])
+  instrumentId String
+  instrument   Instrument  @relation(fields: [instrumentId], references: [id])
+  status       ApplicationStatus @default(SUBMITTED)
+  submittedAt  DateTime @default(now())
+  scheduleSlot ScheduleSlot?
+  verification VerificationRecord?
+}
+
+model ScheduleSlot {
+  id             String   @id @default(uuid())
+  applicationId  String   @unique
+  application    Application @relation(fields: [applicationId], references: [id])
+  officerId      String
+  officer        Stakeholder @relation("OfficerSlots", fields: [officerId], references: [id])
+  plannedDate    DateTime
+  // groups nearby applications into one officer's daily route —
+  // this field is what the geo-clustering scheduler actually writes to
+  routeClusterId String?
+}
+
+model VerificationRecord {
+  id                 String   @id @default(uuid())
+  applicationId      String   @unique
+  application        Application @relation(fields: [applicationId], references: [id])
+  observations       Json // raw field readings, schema driven by InstrumentType.parameterSchema
+  photoUrls          String[]
+  gpsLat             Float
+  gpsLng             Float
+  capturedAt         DateTime // when the officer recorded it, OFFLINE, in the field
+  syncedAt           DateTime @default(now()) // when it actually reached the server — the gap between the two is the offline window
+  clientSubmissionId String   @unique // idempotency key so a retried sync never double-writes
+  certificate        Certificate?
+}
+
+model Certificate {
+  id             String   @id @default(uuid())
+  verificationId String   @unique
+  verification   VerificationRecord @relation(fields: [verificationId], references: [id])
+  verifiedDate   DateTime
+  expiryDate     DateTime
+  signedToken    String   @unique // the LM1.<payload>.<signature> token from certificate-engine.js
+  signingKeyId   String // which authority key signed it — supports rotation without breaking old certs
+  revoked        Boolean  @default(false)
+}
